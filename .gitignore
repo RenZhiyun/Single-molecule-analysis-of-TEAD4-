@@ -1,0 +1,7 @@
+# R session data
+.RData
+.Rhistory
+.Rapp.history
+
+# R environment
+*.Rproj.user/

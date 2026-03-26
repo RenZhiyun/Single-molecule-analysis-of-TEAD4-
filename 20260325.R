@@ -1,0 +1,100 @@
+library(stringr)
+library(tidyr)
+library(reshape2)
+TEAD4_motif_PWM=read.table("MA0809.2.txt") 
+colnames(TEAD4_motif_PWM)=c("A","C","G","T")
+ACGT=data.frame(rbind("A"=rep("a",8),"C"=rep("c",8),"G"=rep("g",8),"T"=rep("t",8)))
+apply(TEAD4_motif_PWM,1,sum)
+TEAD4_motif_PWM=data.frame(t(TEAD4_motif_PWM))
+### energy kt ktlnsum  
+grid_for=expand.grid(TEAD4_motif_PWM$X1,
+                     TEAD4_motif_PWM$X2,
+                     TEAD4_motif_PWM$X3,
+                     TEAD4_motif_PWM$X4,
+                     TEAD4_motif_PWM$X5,
+                     TEAD4_motif_PWM$X6,
+                     TEAD4_motif_PWM$X7,
+                     TEAD4_motif_PWM$X8
+)
+base_for=expand.grid(ACGT$X1,
+                     ACGT$X2,
+                     ACGT$X3,
+                     ACGT$X4,
+                     ACGT$X5,
+                     ACGT$X6,
+                     ACGT$X7,
+                     ACGT$X8
+)
+sum_grid_for=apply(grid_for,1,function(x){sum(log(x))})  
+sum_grid_for=data.frame(base_for,sum_grid_for)
+comb_sum_grid_for=unite(sum_grid_for,"motif", "Var1", "Var2", "Var3", "Var4", "Var5", "Var6", "Var7", "Var8",
+                        sep = "")
+comb_sum_grid_for=comb_sum_grid_for[comb_sum_grid_for$sum_grid_for>8*log(0.1),]
+TEAD4_motif_PWM_rev=TEAD4_motif_PWM[4:1,8:1]
+colnames(TEAD4_motif_PWM_rev)=colnames(TEAD4_motif_PWM)
+row.names(TEAD4_motif_PWM_rev)=row.names(TEAD4_motif_PWM)
+grid_rev=expand.grid(TEAD4_motif_PWM_rev$X1,
+                     TEAD4_motif_PWM_rev$X2,
+                     TEAD4_motif_PWM_rev$X3,
+                     TEAD4_motif_PWM_rev$X4,
+                     TEAD4_motif_PWM_rev$X5,
+                     TEAD4_motif_PWM_rev$X6,
+                     TEAD4_motif_PWM_rev$X7,
+                     TEAD4_motif_PWM_rev$X8
+)
+sum_grid_rev=apply(grid_rev,1,function(x){sum(log(x))})
+sum_grid_rev=data.frame(base_for,sum_grid_rev)
+comb_sum_grid_rev=unite(sum_grid_rev,"motif", "Var1", "Var2", "Var3", "Var4", "Var5", "Var6", "Var7", "Var8",
+                        sep = "")
+comb_sum_grid_rev=comb_sum_grid_rev[comb_sum_grid_rev$sum_grid_rev>8*log(0.1),]
+#
+trunk_MCAT10=read.table("lamda DNA.txt")
+trunk_MCAT10=trunk_MCAT10$V1
+sequence=tolower(trunk_MCAT10)
+locate_ene_for=list()
+for (i in 1:nrow(comb_sum_grid_for)){
+  locate_ene_for[[i]]=unlist(str_locate_all(sequence,comb_sum_grid_for$motif[i]))
+}
+locate_ene_rev=list()
+for (i in 1:nrow(comb_sum_grid_rev)){
+  locate_ene_rev[[i]]=unlist(str_locate_all(sequence,comb_sum_grid_rev$motif[i]))
+}
+locate_ene_for=data.frame(do.call(cbind, lapply(lapply(locate_ene_for, unlist), `length<-`, max(lengths(locate_ene_for)))))
+locate_ene_rev=data.frame(do.call(cbind, lapply(lapply(locate_ene_rev, unlist), `length<-`, max(lengths(locate_ene_rev)))))
+comb_ene_for=data.frame(comb_sum_grid_for,t(locate_ene_for))
+comb_ene_rev=data.frame(comb_sum_grid_rev,t(locate_ene_rev))
+rownames(comb_ene_for)=comb_ene_for$sum_grid_for
+comb_ene_for=comb_ene_for[,-c(1,2)]
+rownames(comb_ene_rev)=comb_ene_rev$sum_grid_rev
+comb_ene_rev=comb_ene_rev[,-c(1,2)]
+comb_ene_for=as.matrix(comb_ene_for)
+comb_ene_rev=as.matrix(comb_ene_rev)
+for (i in 1:nrow(comb_ene_for)){
+  comb_ene_for[i,1:as.numeric(sum(!is.na(comb_ene_for[i,]))/2)]=NA
+}
+for (i in 1:nrow(comb_ene_rev)){
+  comb_ene_rev[i,1:as.numeric(sum(!is.na(comb_ene_rev[i,]))/2)]=NA
+}
+comb_ene_for=t(comb_ene_for)
+comb_ene_for_reshape=melt(comb_ene_for,measure=c(colnames(comb_ene_for)))
+comb_ene_for_reshape=na.omit(comb_ene_for_reshape)
+comb_ene_for_reshape=comb_ene_for_reshape[,-1]
+comb_ene_for_reshape$value=comb_ene_for_reshape$value-4
+comb_ene_rev=t(comb_ene_rev)
+comb_ene_rev_reshape=melt(comb_ene_rev,measure=c(colnames(comb_ene_rev)))
+comb_ene_rev_reshape=na.omit(comb_ene_rev_reshape)
+comb_ene_rev_reshape=comb_ene_rev_reshape[,-1]
+comb_ene_rev_reshape$value=comb_ene_rev_reshape$value-4
+comb_ene=rbind(comb_ene_for_reshape,comb_ene_rev_reshape)
+comb_ene=comb_ene[order(comb_ene$Var2,decreasing = T),]
+colnames(comb_ene)=c("binding energy","site")
+#MCAT ACATTCCA
+comb_ene$"P_nol"=exp(comb_ene$`binding energy`)/0.784558*0.847847*0.957880*0.960057*0.923815*0.929168*0.961325*0.791461#MCAT ACATTCCA
+comb_ene$"ene_nol"=log(comb_ene$"P_nol")
+locate_ene_trunk_MCAT10=data.frame(comb_ene$site,comb_ene$ene_nol)
+e_ene=8*log(0.4) 
+locate_ene_e=locate_ene_trunk_MCAT10[locate_ene_trunk_MCAT10$comb_ene.ene_nol>=e_ene,]
+data_ene_trunk_MCAT10=data.frame("site"=4:c(nchar(sequence)-4),"binding energy"=e_ene)
+data_ene_trunk_MCAT10[match(locate_ene_e$comb_ene.site,data_ene_trunk_MCAT10$site),2]=locate_ene_e$comb_ene.ene_nol
+plot(data_ene_trunk_MCAT10)
+write.csv(data_ene_trunk_MCAT10,"lamda_e04.csv")
